@@ -1,0 +1,39 @@
+[Settings]
+Active Directory=D:\Dropbox\Dropbox\Github\IRL\firmware\
+Target=PIC16F1825
+Active Compiler=BoostC
+Active Config=Release
+Last Ext=h
+Config=0
+Type=0
+Warnings=1
+Model=0
+Profiling=0
+Snapshot=0
+[Files]
+Count=2
+File0=irl.c
+File1=irl.h
+File2=irl.h
+File3=irl.h
+File4=irl.h
+File5=irl.h
+File6=irl.h
+File7=irl.h
+File8=cvocd.h
+[Tools]
+BoostDir=C:\Program Files (x86)\SourceBoost\
+Programmer=
+PrefixWithBuildThreadNum=0
+[Debugger]
+DebugFromMain=1
+[Watch]
+Count=0
+[Watchpoint]
+Count=0
+[Register]
+Core=1
+Ports=1
+Interrupt=1
+Eeprom=1
+Misc=1

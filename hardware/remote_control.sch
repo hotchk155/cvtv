@@ -16009,6 +16009,7 @@ Schmitt Trigger</text>
 <text x="17.018" y="3.81" size="4.572" layer="91">IRL - INFRA RED LISTENER rev 1</text>
 <text x="17.018" y="-3.81" size="4.572" layer="91">2020/Sixty-Four Pixels Ltd </text>
 <text x="17.018" y="-11.43" size="4.572" layer="91">CC-BY-NC-SA</text>
+<text x="349.758" y="58.674" size="3.81" layer="91">***DO NOT USE TL072 - USE SINGLE SUPPLY OPAMP LM358 OR BETTER ***</text>
 </plain>
 <instances>
 <instance part="IC2" gate="G$1" x="68.58" y="50.8"/>
