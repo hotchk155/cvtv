@@ -277,11 +277,11 @@ void main()
 	int i=0;
 	while(1) {
 		dac_set(i);
-		i+=1; if(i>4095) i=0;
-		P_GATE_OUT = 0;
-		delay_ms(100);
-		P_GATE_OUT = 1;
-		delay_ms(100);
+		i+=4; if(i>4095) i=0;
+		P_GATE_OUT = !P_TRIG_IN;
+		//delay_ms(1);
+		//P_GATE_OUT = 1;
+		//delay_ms(1);
 	}
 	
 	
