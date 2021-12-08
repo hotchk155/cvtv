@@ -17,6 +17,8 @@
 #pragma DATA _CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _MCLRE_OFF &_CLKOUTEN_OFF
 #pragma DATA _CONFIG2, _WRT_OFF & _PLLEN_OFF & _STVREN_ON & _BORV_19 & _LVP_OFF
 #pragma CLOCK_FREQ 16000000
+//#pragma DATA _CONFIG2, _WRT_OFF & _PLLEN_ON & _STVREN_ON & _BORV_19 & _LVP_OFF
+//#pragma CLOCK_FREQ 32000000
 
 /*
 VDD        VSS
@@ -52,6 +54,12 @@ READ2		RC3        RC2	GATE_OUT
 
 typedef unsigned char byte;
 
+typedef struct {
+	unsigned int full_message;
+	unsigned int address;
+	unsigned int command;
+} RC_MESSAGE;
+
 enum {
 	ST_WAITING,
 	ST_CAPTURING,
@@ -59,7 +67,7 @@ enum {
 };
 
 #define MAX_EDGES 	100
-volatile unsigned short edge[MAX_EDGES];
+volatile byte edge[MAX_EDGES];
 volatile int edge_count = 0;
 volatile byte capture_state = 0;
 
@@ -90,38 +98,29 @@ volatile byte g_i2c_tx_buf_len = 0;			// total number of bytes in buffer
 void interrupt( void )
 {
 	/////////////////////////////////////////////////////
-	// TIMER0 OVERFLOW
-	// indicates a timeout waiting for an IR transition
-	if(intcon.2)
+	// Timer 1 overflows when we time out at end of a message
+	if(pir1.0)
 	{
-		switch(capture_state) {
-			case ST_WAITING:
-			case ST_PENDING:			
-				// the timer is always running, so we'll periodically
-				// get this interrupt while waiting for IR info or for
-				// a message to be processed
-				break;
-			case ST_CAPTURING:
-P_GATE_OUT = 0;		
-				capture_state = ST_PENDING;
-				intcon.4 = 0;		// disable the INT pin
-				option_reg.6 = 0; 	// next INT pin interrupt will be falling edge
-				break;
-				
-		}
-		intcon.2 = 0;				
+		t1con.0 = 0;	// stop the timer
+		capture_state = ST_PENDING;
+		intcon.4 = 0;		// disable the INT pin
+		option_reg.6 = 0; 	// next INT pin interrupt will be falling edge
+		pir1.0 = 0;				
 	}
 	
 	// external interrupt condition
 	if(intcon.1) {
-		byte d = tmr0;
-		tmr0 = 0;
-P_SCAN3 = !P_SCAN3;		
+		// capture the timer value
+		byte d = tmr1h;
+		
+		// reset the timer
+		tmr1l = 0;
+		tmr1h = 0;
 		switch(capture_state) {
 			case ST_WAITING:
 				edge_count = 0;
 				capture_state = ST_CAPTURING;
-P_GATE_OUT = 1;		
+				t1con.0 = 1;	// start the timer
 				break;
 			case ST_CAPTURING:				
 				if(edge_count < MAX_EDGES-1) {
@@ -277,7 +276,7 @@ void uart_init()
 	pie1.5 = 1;		//RCIE 		enable
 	
 	baudcon.4 = 0;	// SCKP		synchronous bit polarity 
-	baudcon.3 = 1;	// BRG16	enable 16 bit brg
+	baudcon.3 = 0;	// BRG16	enable 16 bit brg
 	baudcon.1 = 0;	// WUE		wake up enable off
 	baudcon.0 = 0;	// ABDEN	auto baud detect
 		
@@ -294,7 +293,8 @@ void uart_init()
 	rcsta.4 = 0;	// CREN 	continuous receive enable
 		
 	spbrgh = 0;		// brg high byte
-	spbrg = 31;		// brg low byte 
+	//spbrg = 51;		// brg low byte 
+	spbrg = 25;		// brg low byte 
 	
 }
 
@@ -306,8 +306,9 @@ void uart_send(byte ch)
 
 void uart_send_string(byte *ch) 
 {
-	while(*ch++) {
+	while(*ch) {
 		uart_send(*ch);
+		++ch;
 	}
 }
 
@@ -319,6 +320,13 @@ void uart_send_number(byte ch) {
 	uart_send('0' + ch);
 }
 
+void uart_send_binary(unsigned int data) {
+	unsigned int mask = 1<<32;
+	uart_send((data&mask)? '1':'0' + ch/100);
+	while(mask) {
+		mask>>=1;
+	}
+}
 
 enum {
 	POS_MIDDLE,
@@ -440,88 +448,288 @@ unsigned int parse_SONY() {
 	return data;	
 }
 
-unsigned int parse_RC5() {
-	const int MIN_SGL_TICKS = (700/TIMER0_TICK_US);
-	const int MAX_SGL_TICKS = (1100/TIMER0_TICK_US);
-	const int MIN_DBL_TICKS = (1600/TIMER0_TICK_US);
-	const int MAX_DBL_TICKS = (2000/TIMER0_TICK_US);
-	enum {
-		LEFTOVER_NONE,
-		LEFTOVER_MARK,
-		LEFTOVER_SPACE
-	};
+/*
+	Timer 1 speed is 16MHz
+	one tick of timer1 high byte is is 16us	
 	
-	unsigned int data = 0; // first bit is always a 1
-	int leftover = LEFTOVER_SPACE;
+	leader pulse
+	2666us MARK 889us SPACE (166, 55)
 	
+	normal bit
+	444us MARK 444us SPACE (27)
 	
-	// eat through the data a pair of edges at a time
-	// so ON time followed by OFF time
-	for(int i=0; i<edge_count; i+=2) {
+	trailer bits
+	889us MARK 889us SPACE (55)
 	
-		if(1) { // MARK
-			if(leftover == LEFTOVER_SPACE) {
-				//_X this is a 1
-				data<<=1; data|=1;
-				// we're up to date
-				leftover = LEFTOVER_NONE;
-			}
-			else {
-				// will deal with it when we see next space
-				leftover = LEFTOVER_MARK;
+	timeout is 4096us (256)
+	
+*/
+
+
+////////////////////////////////////////////////
+// 0         1         2         3         4         
+// 012345678901234567890123456789012345678901234
+// HHHLLHL ........................................ start
+//        010101 .................................. field
+//              XXXX .............................. toggle
+//                  XXXXXXXXXXXXXX ................ address
+//                                XXXXXXXXXXXXXX .. command
+
+int parse_RC6(RC_MESSAGE *msg) {
+	const int DBL_WIDTH_TICKS = 45;
+	const int TRB_WIDTH_TICKS = 70;
+	const int MAX_WIDTH_TICKS = 180;
+	int input_level = 1;		
+	unsigned int full_message = 0;
+	int t = 0;
+	for(int i=0; i<edge_count; ++i) {			
+		if(edge[i] > MAX_WIDTH_TICKS) {
+			return 0;
+		}
+		if(edge[i] > TRB_WIDTH_TICKS) {
+			if(t++ & 1) {
+				full_message<<=1;
+				full_message|=input_level;
 			}
 		}
-		else if(1) { // DOUBLE MARK
-			if(leftover == LEFTOVER_SPACE) {
-				//_X(X) this is a 1
-				data<<=1; data|=1;
-				// half a mark to go
-				leftover = LEFTOVER_MARK;
+		if(edge[i] > DBL_WIDTH_TICKS) {
+			if(t++ & 1) {
+				full_message<<=1;
+				full_message|=input_level;
 			}
-			else {
-				// not valid!
-				return 0;
-			}
+		}
+		if(t++ & 1) {
+			full_message<<=1;
+			full_message|=input_level;
+		}
+		input_level	= !input_level;
+	}
+	if((full_message & 0xE00000) != 0xa00000) {
+		return 0;
+	}
+	msg->full_message = full_message;
+	msg->address = ((full_message>>8) & 0xFF);
+	msg->command = (full_message & 0xFF);
+	return 1;
+}
+
+
+////////////////////////////////////////////////
+void xxparse_RC6() {
+	const int DBL_WIDTH_TICKS = 45;
+	const int TRB_WIDTH_TICKS = 70;
+	const int MAX_WIDTH_TICKS = 180;
+	int input_level = 1;
+	int half_bit_remainder = 0;
+		
+	char sample[100];  // has to be signed char or compiler messes up
+	byte samp = 0;
+	for(int i=0; i<edge_count; ++i) {			
+		if(edge[i] > MAX_WIDTH_TICKS) {
+			//return 0;
+		}
+		if(edge[i] > TRB_WIDTH_TICKS) {
+			sample[samp++] = input_level;
+		}
+		if(edge[i] > DBL_WIDTH_TICKS) {
+			sample[samp++] = input_level;
+		}
+		sample[samp++] = input_level;
+		input_level	= !input_level;
+	}
+
+	uart_send_number(samp);								
+	uart_send_string("samples \r\n");								
+
+	// 0         1         2         3         4         
+	// 012345678901234567890123456789012345678901234
+	// HHHLLHL ........................................ start
+	//        010101 .................................. field
+	//              XXXX .............................. toggle
+	//                  XXXXXXXXXXXXXX ................ address
+	//                                XXXXXXXXXXXXXX .. command
+	
+	
+	for(int i=0; i<samp; ++i) {			
+		uart_send_string(sample[i]? "X":"_");								
+	}
+	uart_send_string("\r\n");							
+	for(int i=0; i<samp; ++i) {			
+		if(i>5 && !!(i&1)) {
+			uart_send_string(sample[i]? "1":"0");								
 		}
 		else {
-			// pulse width out of whack
+			uart_send_string(" ");								
 		}
+	}
+}
 
 
-		if(1) { // SPACE
-			if(leftover == LEFTOVER_MARK) {
-				// X_ this is a 0
-				data<<=1; 
-				// we're up to date
-				leftover = LEFTOVER_NONE;
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+#if 0
+////////////////////////////////////////////////
+void parse_RC6() {
+	const int DBL_WIDTH_TICKS = 45;
+	const int LEADER_MARK_MIN_TICKS = 150;
+	const int LEADER_MARK_MAX_TICKS = 180;
+	const int LEADER_SPACE_MIN_TICKS = 40;
+	const int LEADER_SPACE_MAX_TICKS = 60;
+	int input_level = 1;
+	int half_bit_remainder = 0;
+	
+	
+	if( edge[0] < LEADER_MARK_MIN_TICKS ||
+		edge[0] > LEADER_MARK_MAX_TICKS ||
+		edge[1] < LEADER_SPACE_MIN_TICKS ||
+		edge[1] > LEADER_SPACE_MAX_TICKS) {
+	//	return 0;
+	}
+
+	
+	for(int i=2; i<edge_count; ++i) {			
+		if(edge[i] >= DBL_WIDTH_TICKS) {
+			if(half_bit_remainder) { // half a LOW bit from previous period
+				uart_send_string(input_level? "0":"1");				
 			}
 			else {
-				// will deal with it when we see next mark
-				leftover = LEFTOVER_SPACE;
+				// must be a long half-bit (double HIGH period not valid here)
+				half_bit_remainder = 1;
 			}
 		}
-		else if(1) { // DOUBLE SPACE
-			if(leftover == LEFTOVER_MARK) {
-				// X_(_) this is a 0
-				data<<=1; 
-				// half a mark to go
-				leftover = LEFTOVER_SPACE;
+		else { 
+			if(half_bit_remainder) {
+				// mark a rising edge and clear half bit remainder
+				uart_send_string(input_level? "0":"1");				
+				half_bit_remainder = 0;
 			}
 			else {
-				// not valid!
-				return 0;
+				half_bit_remainder = 1;
 			}
 		}
+		input_level	= !input_level;
+	}
+	if(half_bit_remainder) {
+		uart_send_string(input_level? "0.":"1.");				
+	}
+}
+void parse_RC5() {
+	const int DBL_WIDTH_TICKS = 45;
+	char qq[100];
+	int q=0;
+	int input_level = 1;
+	int half_bit_remainder = 0;
+	
+
+	byte t[MAX_EDGES];	
+	int min = 0;
+	for(int i=0; i<edge_count; i+=2) {
+		if(!min || edge[i]<min) {
+			min = edge[i];
+		}
+	}
+	if(!min) {
+		return;
 	}
 	
-	// the receiving routine will time out after the last pulse, so
-	// if we have a leftover mark we need to add another zero bit
-	// to the end of the data
-	if(leftover == LEFTOVER_MARK) {
-		data<<=1;
+	
+	
+	
+	for(int i=0; i<edge_count; i+=2) {
+		t[i] = (min/2+edge[i])/min;
+		t[i+1] = (min/2+edge[i+1])/min;
+		uart_send_string("mark ");						
+		uart_send_number(t[i]);
+		uart_send_string("t space ");						
+		uart_send_number(t[i+1]);
+		uart_send_string("t\r\n");						
 	}
-	return data;	
+	
+	for(int i=0; i<edge_count; ++i) {
+	
+		
+		if(edge[i] >= DBL_WIDTH_TICKS) {
+			if(input_level) { // input is HIGH for this period
+				if(half_bit_remainder) { // half a LOW bit from previous period
+					// mark a rising edge and leave half bit remainder
+					qq[q++] = '1';
+					qq[q++] = ' ';
+					uart_send_string("XX");				
+				}
+				else {
+					// must be a long half-bit (double HIGH period not valid here)
+					half_bit_remainder = 1;
+					uart_send_string("XX");				
+					qq[q++] = ' ';
+					qq[q++] = ' ';
+				}
+				
+			}
+			else { // input is LOW for this period
+				if(half_bit_remainder) { // half a HIGH bit from previous period
+					// mark a falling edge and leave half bit remainder
+					qq[q++] = '0';
+					qq[q++] = ' ';
+					uart_send_string("__");				
+				}
+				else {
+					// must be a long half-bit (double LOW period not valid here)
+					half_bit_remainder = 1;
+					uart_send_string("__");				
+					qq[q++] = ' ';
+					qq[q++] = ' ';
+				}
+			}		
+		}
+		else if(input_level) { // input is HIGH
+			uart_send_string("X");				
+			if(half_bit_remainder) {
+				// mark a rising edge and clear half bit remainder
+				qq[q++] = '1';
+				half_bit_remainder = 0;
+			}
+			else {
+				qq[q++] = ' ';
+				half_bit_remainder = 1;
+			}
+		}
+		else { // input is LOW
+			uart_send_string("_");				
+			if(half_bit_remainder) {
+				// mark a falling edge and clear half bit remainder
+				qq[q++] = '0';
+				half_bit_remainder = 0;
+			}
+			else {
+				qq[q++] = ' ';
+				half_bit_remainder = 1;
+			}
+		}
+		input_level	= !input_level;
+	}
+	if(half_bit_remainder) {
+		if(input_level) {
+			qq[q++] = '1';	
+			uart_send_string("X.");				
+		}
+		else {
+			qq[q++] = '0';	
+			uart_send_string("_.");				
+		}
+	}
+	qq[q++] = 0;	
+	uart_send_string("\r\n");				
+	uart_send_string(qq);				
+	
 }
+#endif 
 
 
 ////////////////////////////////////////////////////////////
@@ -530,6 +738,7 @@ void main()
 { 		
 	// osc control / 16MHz / internal
 	osccon = 0b01111010;
+	//osccon = 0b11110000; //32MHz
 
 	trisa 	= TRIS_A;              	
     trisc 	= TRIS_C;   	
@@ -545,6 +754,13 @@ void main()
 	option_reg.6 = 0; 	// INT pin interrupt on FALLING edge (active low output)
 	intcon.4 = 1;		// enable INT pint interrupt
 	
+	t1con.7 = 0;	// Fosc source for timer 1 
+	t1con.6 = 1;	//
+	t1con.5 = 0;	// Prescaler = 1:1
+	t1con.4 = 0;
+	pie1.0 = 1;		// enable timer 1 interrupt
+
+	
 	// enable interrupts	
 	intcon.7 = 1; //GIE
 	intcon.6 = 1; //PEIE
@@ -553,18 +769,22 @@ void main()
 	// initialise the various modules
 	uart_init();
 	//i2c_init();	
-	timer_init();	
+	//timer_init();	
+
+	
 
 	capture_state = ST_WAITING;
-	/*
-	while(1) {	
-		uart_send_string("Hello");
-		delay_ms(100);
-	}
-	*/
+	
+	//while(1) {	
+		//uart_send_string("Hello\r\n");
+		//delay_ms(100);
+	//}
+	
 	
 	while(1) {	
 		if(ST_PENDING == capture_state) {
+#if 0		
+			uart_send_string("=======\r\n");			
 			for(int i=0; i<edge_count; i+=2) {
 				uart_send_string("MARK ");
 				uart_send_number(edge[i]);
@@ -572,9 +792,13 @@ void main()
 				uart_send_number(edge[i+1]);
 				uart_send_string("\r\n");
 			}
+#endif			
+			parse_RC6();
+			uart_send_string("\r\n");
 			delay_s(1);
 			capture_state = ST_WAITING;
-			intcon.4 = 1;
+			intcon.1 = 0; // clear INT fired status
+			intcon.4 = 1; // enable the INT pin
 		}
 	}
 
