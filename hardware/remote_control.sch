@@ -16131,10 +16131,10 @@ Schmitt Trigger</text>
 <wire x1="238.76" y1="66.04" x2="238.76" y2="68.58" width="0.1524" layer="91"/>
 </segment>
 <segment>
-<pinref part="IR_DET" gate="A" pin="2"/>
-<wire x1="218.44" y1="30.48" x2="226.06" y2="30.48" width="0.1524" layer="91"/>
 <pinref part="GND25" gate="1" pin="GND"/>
 <wire x1="226.06" y1="25.4" x2="226.06" y2="30.48" width="0.1524" layer="91"/>
+<pinref part="IR_DET" gate="A" pin="3"/>
+<wire x1="218.44" y1="33.02" x2="226.06" y2="30.48" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="JP2" gate="A" pin="3"/>
@@ -16348,10 +16348,10 @@ Schmitt Trigger</text>
 </net>
 <net name="VDD" class="0">
 <segment>
-<pinref part="IR_DET" gate="A" pin="3"/>
-<wire x1="218.44" y1="33.02" x2="226.06" y2="33.02" width="0.1524" layer="91"/>
 <pinref part="U$14" gate="G$1" pin="VDD"/>
 <wire x1="226.06" y1="38.1" x2="226.06" y2="33.02" width="0.1524" layer="91"/>
+<pinref part="IR_DET" gate="A" pin="2"/>
+<wire x1="218.44" y1="30.48" x2="226.06" y2="33.02" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="J1" gate="G$1" pin="VDD"/>

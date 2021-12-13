@@ -105,3 +105,20 @@ void uart_dump_timings() {
 		uart_send_string("\r\n");
 	}
 }
+
+void uart_dump_msg(RC_MESSAGE *msg) {
+	switch(msg->format) {
+		case IR_UNKNOWN: uart_send_string("UNK "); break;
+		case IR_NEC: uart_send_string("NEC "); break;
+		case IR_SONY: uart_send_string("SONY "); break;
+		case IR_RC6: uart_send_string("RC6 "); break;
+	}
+	uart_send_binary(msg->raw);
+	uart_send_string(" ");
+	uart_send_hex(msg->raw);
+	uart_send_string(" addr:");
+	uart_send_hex(msg->address);
+	uart_send_string(" cmd:");
+	uart_send_hex(msg->command);
+	uart_send_string("\r\n");			
+}

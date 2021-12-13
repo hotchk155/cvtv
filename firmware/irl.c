@@ -69,6 +69,7 @@ volatile int g_edge_count = 0;
 volatile int g_lead_mark_count = 0;
 volatile int g_lead_space_count = 0;
 
+int g_gate_timeout = 0;
 //
 // TYPES
 //
@@ -96,6 +97,16 @@ volatile byte g_i2c_tx_buf_len = 0;			// total number of bytes in buffer
 // INTERRUPT SERVICE ROUTINE
 void interrupt( void )
 {
+	/////////////////////////////////////////////////////
+	// timer 0 rollover ISR. Maintains the count of 
+	// "system ticks" that we use for key debounce etc
+	if(intcon.2)
+	{
+		tmr0 = TIMER_0_INIT_SCALAR;
+		ms_tick = 1;
+		intcon.2 = 0;
+	}
+	
 	/////////////////////////////////////////////////////
 	// Timer 1 overflows 
 	if(pir1.0)
@@ -273,22 +284,6 @@ void dac_set(int dac) {
 	i2c_end();	
 }
     
-////////////////////////////////////////////////////////////
-// INITIALISE TIMER0
-void timer_init() {
-	// Configure timer 0 (controls systemticks)
-	// 	timer 0 runs at 4MHz (
-	//  each tick 0.25us
-	option_reg.5 = 0; // timer 0 driven from instruction cycle clock
-	option_reg.3 = 0; // } timer 0 is prescaled /64
-	option_reg.2 = 1; // }
-	option_reg.1 = 0; // } 
-	option_reg.0 = 1; // }
-	intcon.5 = 1; 	  // enabled timer 0 interrrupt
-	intcon.2 = 0;     // clear interrupt fired flag
-}
-
-
 
 enum {
 	POS_MIDDLE,
@@ -359,10 +354,16 @@ void blink(int count) {
 	delay_ms(255);
 }
 
+#define GATE_DURATION_MS 100
+void on_ir_msg(RC_MESSAGE *msg) {
+	if(msg->format) { // successfully parsed?
+		P_GATE_OUT = 0;
+		dac_set((1000 * (unsigned long)msg->command)/256);
+		P_GATE_OUT = 1;
+		g_gate_timeout = 100;
+	}
+}
 
-
-// each timer tick is 8us
-//#define TIMER0_TICK_US	8
 
 
 ////////////////////////////////////////////////////////////
@@ -393,28 +394,47 @@ void main()
 	t1con.4 = 1;
 	pie1.0 = 1;		// enable timer 1 interrupt
 
-	
+
+	// Configure timer 0 (controls systemticks)
+	// 	timer 0 runs at 4MHz (
+	//  each tick 0.25us
+	option_reg.5 = 0; // timer 0 driven from instruction cycle clock
+	option_reg.3 = 0; // } timer 0 is prescaled /64
+	option_reg.2 = 1; // }
+	option_reg.1 = 0; // } 
+	option_reg.0 = 1; // }
+	intcon.5 = 1; 	  // enabled timer 0 interrrupt
+	intcon.2 = 0;     // clear interrupt fired flag
+
 	// enable interrupts	
 	intcon.7 = 1; //GIE
 	intcon.6 = 1; //PEIE
 
-	g_cv_dac_pending = 0;
+	//g_cv_dac_pending = 0;
+	i2c_init();	
+	dac_init();
 	// initialise the various modules
-	uart_init();
-	//i2c_init();	
+	//uart_init();
 	//timer_init();	
 
+/*
+	byte q=0;
+	for(;;) {
+		if(ms_tick) {
+			q++;
+			ms_tick  = 0;
+			P_GATE_OUT = !!(q&0x80);
+		}
+	}
+*/
 
 	g_capture_state = ST_WAITING;
 	
-	//while(1) {	
-		//uart_send_string("Hello\r\n");
-		//delay_ms(100);
-	//}
-	
-	
-	while(1) {	
+	for(;;)
+	{	
 		if(ST_PENDING == g_capture_state) {
+			P_GATE_OUT = 1;
+			g_gate_timeout=100;
 			//uart_dump_timings();
 			RC_MESSAGE msg;
 			memset(&msg,0,sizeof(msg));
@@ -423,62 +443,30 @@ void main()
 					parse_RC6(&msg);
 				}
 			}
-			switch(msg.format) {
-				case IR_UNKNOWN: uart_send_string("UNK "); break;
-				case IR_NEC: uart_send_string("NEC "); break;
-				case IR_SONY: uart_send_string("SONY "); break;
-				case IR_RC6: uart_send_string("RC6 "); break;
-			}
-			uart_send_binary(msg.raw);
-			uart_send_string(" ");
-			uart_send_hex(msg.raw);
-			uart_send_string(" addr:");
-			uart_send_hex(msg.address);
-			uart_send_string(" cmd:");
-			uart_send_hex(msg.command);
-			uart_send_string("\r\n");			
-			delay_s(1);
+			on_ir_msg(&msg);
 			g_capture_state = ST_WAITING;
 			intcon.1 = 0; // clear INT fired status
 			intcon.4 = 1; // enable the INT pin
 		}
-	}
-
-	while(1) {
-		read_switches();
-		blink(switch_pos[0]);
-		blink(switch_pos[1]);
-		blink(switch_pos[2]);
-		delay_ms(200);
-		delay_ms(200);
-		delay_ms(200);
-	}
-
-	dac_init();
-	//dac_set(2000);
-	int i=0;
-	while(1) {
-		dac_set(i);
-		i+=4; if(i>4095) i=0;
-		P_GATE_OUT = !P_TRIG_IN;
-		//delay_ms(1);
-		//P_GATE_OUT = 1;
-		//delay_ms(1);
-	}
 	
-	
-	for(;;)
-	{	
 		// once per millisecond tick event
 		if(ms_tick) {
+			if(g_gate_timeout) {
+				if(!--g_gate_timeout) {
+					P_GATE_OUT = 0;
+				}
+			}
 			ms_tick = 0;
 		}
+		
+		/*
 		// check if there is any CV data to send out and no i2c transmit in progress
 		if(!pie1.3 && g_cv_dac_pending) {
-			//cv_dac_prepare(); 
-			//i2c_send_async();
+			cv_dac_prepare(); 
+			i2c_send_async();
 			g_cv_dac_pending = 0; 
-		}				
+		}
+		*/				
 	}
 }
 

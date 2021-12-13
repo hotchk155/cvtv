@@ -36,3 +36,4 @@ void uart_send_number(int ch);
 void uart_send_hex(unsigned long ch);
 void uart_send_binary(unsigned long data);
 void uart_dump_timings();
+void uart_dump_msg(RC_MESSAGE *msg);

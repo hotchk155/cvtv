@@ -13,12 +13,12 @@ Snapshot=0
 Last ExtIdx=1
 Last Dir=D:\GitHub\cvocd.a\firmware\
 [Files]
-Count=4
-File0=irl.c
-File1=irl.h
-File2=decoders.c
+Count=5
+File0=decoders.c
+File1=irl.c
+File2=irl.h
 File3=uart_debug.c
-File4=irl.h
+File4=sequencer.c
 File5=irl.h
 File6=irl.h
 File7=irl.h
