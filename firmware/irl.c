@@ -354,17 +354,12 @@ void blink(int count) {
 	delay_ms(255);
 }
 
-#define GATE_DURATION_MS 100
-void on_ir_msg(RC_MESSAGE *msg) {
-	if(msg->format) { // successfully parsed?
+void output_cv(int dac, int duration) {
 		P_GATE_OUT = 0;
-		dac_set((1000 * (unsigned long)msg->command)/256);
+		dac_set(dac);
 		P_GATE_OUT = 1;
-		g_gate_timeout = 100;
-	}
+		g_gate_timeout = duration;
 }
-
-
 
 ////////////////////////////////////////////////////////////
 // MAIN
@@ -429,6 +424,8 @@ void main()
 */
 
 	g_capture_state = ST_WAITING;
+	byte last_trig_in = 0;
+	byte last_clock_in = 0;
 	
 	for(;;)
 	{	
@@ -443,12 +440,24 @@ void main()
 					parse_RC6(&msg);
 				}
 			}
-			on_ir_msg(&msg);
+			seq_on_ir(&msg);
 			g_capture_state = ST_WAITING;
 			intcon.1 = 0; // clear INT fired status
 			intcon.4 = 1; // enable the INT pin
 		}
 	
+		byte trig_in = !!P_TRIG_IN;
+		if(trig_in != last_trig_in) {
+			last_trig_in = trig_in;
+			seq_on_trig(trig_in);
+		}
+		byte clock_in = !!P_CLOCK_IN;
+		if(clock_in != last_clock_in) {
+			last_clock_in = clock_in;
+			seq_on_clock(clock_in);
+		}
+		
+		
 		// once per millisecond tick event
 		if(ms_tick) {
 			if(g_gate_timeout) {
@@ -456,6 +465,7 @@ void main()
 					P_GATE_OUT = 0;
 				}
 			}
+			seq_run();
 			ms_tick = 0;
 		}
 		

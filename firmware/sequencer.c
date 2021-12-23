@@ -1,4 +1,5 @@
 #include "irl.h"
+#include "rand.h"
 
 
 enum {
@@ -27,8 +28,31 @@ enum {
 	SCALE_DIATONIC		// pitch scale diatonically
 };
 
-void seq_build(RC_MESSAGE *msg) {
+
+int seq_step = 0;
+int seq_seed = 0;
+
+void seq_start() {
+	srand(seq_seed);
+	seq_step = 8+(rand()&7);
+}
+void seq_on_ir(RC_MESSAGE *msg) {
+	seq_seed = msg->command ^ msg->address;
+	seq_start();
+}
+void seq_on_trig(int state) {
+	seq_start();
+}
+void seq_on_clock(int state) {
+	if(seq_step) {
+		int dac = rand()&0x1FFF;
+		output_cv(dac, 100);
+		--seq_step;
+	}
+}
+void seq_run() {
 }
 
 
-void 
+
+ 

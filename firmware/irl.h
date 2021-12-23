@@ -27,6 +27,12 @@ extern int parse_NEC(RC_MESSAGE *msg);
 extern int parse_SONY(RC_MESSAGE *msg);
 extern int parse_RC6(RC_MESSAGE *msg);
 
+extern void seq_on_ir(RC_MESSAGE *msg);
+extern void seq_on_trig(int state);
+extern void seq_on_clock(int state);
+extern void seq_run();
+
+extern void output_cv(int dac, int duration);
 
 
 void uart_init();
