@@ -17370,28 +17370,28 @@ http://www.ee.siue.edu/~alozows/library/datasheets/BFR96.pdf</description>
 <part name="GATE_OUT" library="thonkiconn" deviceset="WQP-PJ301M-12_JACK" device=""/>
 <part name="TRIG_IN" library="thonkiconn" deviceset="WQP-PJ301M-12_JACK" device=""/>
 <part name="D6" library="jason_eagle6" deviceset="TS4148" device=""/>
-<part name="R10" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R13" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R10" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
+<part name="R13" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
 <part name="GND8" library="SparkFun" deviceset="GND" device=""/>
 <part name="U$7" library="microbuilder" deviceset="VDD" device=""/>
 <part name="IC5" library="linear" deviceset="TL072" device="D"/>
-<part name="R14" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="C8" library="resistor" deviceset="C-EU" device="C0805"/>
+<part name="R14" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
+<part name="C8" library="resistor" deviceset="C-EU" device="C0805" value="10n"/>
 <part name="GND18" library="SparkFun" deviceset="GND" device=""/>
-<part name="R4" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R5" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R4" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
+<part name="R5" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
 <part name="GND19" library="SparkFun" deviceset="GND" device=""/>
-<part name="R8" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="C7" library="resistor" deviceset="C-EU" device="C0805"/>
-<part name="R7" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R6" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R8" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
+<part name="C7" library="resistor" deviceset="C-EU" device="C0805" value="20p"/>
+<part name="R7" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
+<part name="R6" library="rcl" deviceset="R-EU_" device="R0805" value="10k"/>
 <part name="GND20" library="SparkFun" deviceset="GND" device=""/>
 <part name="GND21" library="SparkFun" deviceset="GND" device=""/>
 <part name="GND22" library="SparkFun" deviceset="GND" device=""/>
 <part name="U$3" library="microbuilder" deviceset="VDD" device=""/>
 <part name="U$4" library="microbuilder" deviceset="VDD" device=""/>
-<part name="R3" library="rcl" deviceset="R-EU_" device="R0805"/>
-<part name="R2" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R3" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
+<part name="R2" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
 <part name="SW4" library="jason_eagle6" deviceset="MICRO-SPDT" device=""/>
 <part name="SW3" library="jason_eagle6" deviceset="MICRO-SPDT" device=""/>
 <part name="SW2" library="jason_eagle6" deviceset="MICRO-SPDT" device=""/>
@@ -17399,7 +17399,7 @@ http://www.ee.siue.edu/~alozows/library/datasheets/BFR96.pdf</description>
 <part name="D3" library="jason_eagle6" deviceset="TS4148" device=""/>
 <part name="D4" library="jason_eagle6" deviceset="TS4148" device=""/>
 <part name="LED1" library="led" deviceset="LED" device="3MM"/>
-<part name="R11" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R11" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
 <part name="GND10" library="SparkFun" deviceset="GND" device=""/>
 <part name="SW1" library="switch-omron" deviceset="10-XX" device=""/>
 <part name="GND14" library="SparkFun" deviceset="GND" device=""/>
@@ -17410,15 +17410,15 @@ http://www.ee.siue.edu/~alozows/library/datasheets/BFR96.pdf</description>
 <part name="C10" library="resistor" deviceset="CPOL-EU" device="E2-5"/>
 <part name="U$14" library="microbuilder" deviceset="VDD" device=""/>
 <part name="GND25" library="SparkFun" deviceset="GND" device=""/>
-<part name="C6" library="resistor" deviceset="C-EU" device="C0805"/>
+<part name="C6" library="resistor" deviceset="C-EU" device="C0805" value="100n"/>
 <part name="GND26" library="SparkFun" deviceset="GND" device=""/>
 <part name="Q2" library="transistor-neu-to92" deviceset="*-NPN-" device="SOT23-BEC" technology="MMBT3904LT1"/>
 <part name="CLK_IN" library="jason_eagle6" deviceset="THONKICONN_STEREO" device=""/>
 <part name="GND27" library="SparkFun" deviceset="GND" device=""/>
 <part name="D5" library="jason_eagle6" deviceset="TS4148" device=""/>
-<part name="R9" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R9" library="rcl" deviceset="R-EU_" device="R0805" value="1k"/>
 <part name="Q1" library="transistor-neu-to92" deviceset="*-NPN-" device="SOT23-BEC" technology="MMBT3904LT1"/>
-<part name="R12" library="rcl" deviceset="R-EU_" device="R0805"/>
+<part name="R12" library="rcl" deviceset="R-EU_" device="R0805" value="4k7"/>
 <part name="U$6" library="microbuilder" deviceset="VDD" device=""/>
 <part name="GND28" library="SparkFun" deviceset="GND" device=""/>
 <part name="GND29" library="SparkFun" deviceset="GND" device=""/>
